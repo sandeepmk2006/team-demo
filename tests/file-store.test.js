@@ -189,3 +189,36 @@ describe('createFileStore', () => {
     assert.deepStrictEqual(store2.list(), []);
   });
 });
+
+describe('review fixes', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { createFileStore } = require('../src/file-store.js');
+
+  it('a failed write leaves memory unchanged and no temp file behind', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-fail-'));
+    const file = path.join(dir, 'todos.json');
+    const store = createFileStore(file);
+    store.add('kept');
+    fs.rmSync(file);
+    fs.mkdirSync(file); // renaming onto a directory fails on every OS
+    assert.throws(() => store.add('lost'));
+    assert.throws(() => store.update(1, { done: true }));
+    assert.throws(() => store.remove(1));
+    assert.deepEqual(store.list().map((t) => [t.id, t.title, t.done]), [[1, 'kept', false]]);
+    assert.deepEqual(fs.readdirSync(dir).filter((f) => f.includes('.tmp.')), []);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('rejects duplicate ids and malformed records as CORRUPT_STORE', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-bad-'));
+    const file = path.join(dir, 'todos.json');
+    const ok = { id: 1, title: 'a', done: false, createdAt: '2026-01-01T00:00:00.000Z' };
+    for (const data of [[ok, ok], [{ ...ok, id: 'x' }], [{ ...ok, done: 'no' }], [null]]) {
+      fs.writeFileSync(file, JSON.stringify(data));
+      assert.throws(() => createFileStore(file), (e) => e.code === 'CORRUPT_STORE');
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});

@@ -54,7 +54,7 @@ describe('todo filtering', () => {
   });
 
   test('q and done can be combined', async () => {
-    const { response, body } = await get('/api/todos?q=the&done=true');
+    const { response, body } = await get('/api/todos?q=i&done=true');
     assert.equal(response.status, 200);
     assert.deepEqual(body.map((todo) => todo.title), ['Fix the BUG']);
   });

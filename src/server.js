@@ -89,8 +89,8 @@ function createServer(store) {
         let todos = store.list();
         if (done !== null) todos = todos.filter((todo) => todo.done === (done === 'true'));
         if (query !== null) {
-          const normalizedQuery = query.toLocaleLowerCase();
-          todos = todos.filter((todo) => todo.title.toLocaleLowerCase().includes(normalizedQuery));
+          const normalizedQuery = query.toLowerCase();
+          todos = todos.filter((todo) => todo.title.toLowerCase().includes(normalizedQuery));
         }
         sendJson(res, 200, todos);
         return;
@@ -148,7 +148,10 @@ function createServer(store) {
 }
 
 if (require.main === module) {
-  const server = createServer(createStore());
+  const store = process.env.DATA_FILE
+    ? require('./file-store').createFileStore(process.env.DATA_FILE)
+    : createStore();
+  const server = createServer(store);
   server.listen(process.env.PORT || 3000);
 }
 

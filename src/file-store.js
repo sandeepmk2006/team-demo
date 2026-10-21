@@ -2,82 +2,52 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { createStore } = require('./store');
+const { cleanTitle, validationError } = require('./store');
+
+function corrupt(message) {
+  const err = new Error(`Store file is corrupt: ${message}`);
+  err.code = 'CORRUPT_STORE';
+  return err;
+}
+
+function loadTodos(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    throw corrupt('invalid JSON');
+  }
+  if (!Array.isArray(data)) throw corrupt('expected an array');
+  const seen = new Set();
+  for (const t of data) {
+    const valid = t && Number.isInteger(t.id) && t.id > 0 && typeof t.title === 'string'
+      && typeof t.done === 'boolean' && typeof t.createdAt === 'string';
+    if (!valid) throw corrupt(`invalid record ${JSON.stringify(t)}`);
+    if (seen.has(t.id)) throw corrupt(`duplicate id ${t.id}`);
+    seen.add(t.id);
+  }
+  return data;
+}
 
 function createFileStore(filePath) {
   const resolvedPath = path.resolve(filePath);
-  const dir = path.dirname(resolvedPath);
+  const todos = new Map(loadTodos(resolvedPath).map((t) => [t.id, { ...t }]));
+  let nextId = Math.max(0, ...todos.keys()) + 1;
 
-  // Load existing todos from file (missing file = empty)
-  let loaded = [];
-  if (fs.existsSync(resolvedPath)) {
-    const raw = fs.readFileSync(resolvedPath, 'utf8');
+  // Write the candidate state to disk first; memory only changes after the write succeeds,
+  // so a failed write never leaves memory and disk disagreeing.
+  function commit(nextTodos) {
+    const tmp = `${resolvedPath}.tmp.${process.pid}`;
     try {
-      loaded = JSON.parse(raw);
-      if (!Array.isArray(loaded)) {
-        const err = new Error('Store file is corrupt');
-        err.code = 'CORRUPT_STORE';
-        throw err;
-      }
-    } catch (e) {
-      if (e.code === 'CORRUPT_STORE') throw e;
-      const err = new Error('Store file is corrupt');
-      err.code = 'CORRUPT_STORE';
+      fs.writeFileSync(tmp, JSON.stringify([...nextTodos.values()]), 'utf8');
+      fs.renameSync(tmp, resolvedPath);
+    } catch (err) {
+      fs.rmSync(tmp, { force: true });
       throw err;
     }
-  }
-
-  // Delegate to the in-memory store for all business-logic/validation
-  const inner = createStore();
-
-  // Determine highest existing id so auto-increment continues correctly
-  let maxId = 0;
-  for (const todo of loaded) {
-    if (typeof todo.id === 'number' && todo.id > maxId) maxId = todo.id;
-  }
-
-  // Replay loaded todos into the inner store by directly injecting them
-  // We need to get access to the inner map — but createStore doesn't expose it.
-  // Instead we build a thin wrapper that keeps its own canonical array and
-  // delegates validation to createStore's methods.
-
-  // Re-approach: build the file store from scratch, reusing validation helpers
-  // from store.js by requiring them. But store.js only exports createStore.
-  // Decision: replicate the validation inline (same rules) and delegate to
-  // a private in-memory map, mirroring store.js exactly.
-
-  // Actually, simplest correct approach: maintain our own Map + nextId,
-  // reuse createStore() purely for validation by calling its methods in a
-  // throw-away manner. But that's convoluted.
-
-  // Cleanest approach: just reimplement with same logic, adding persistence.
-
-  const todos = new Map();
-  let nextId = maxId + 1;
-
-  for (const todo of loaded) {
-    todos.set(todo.id, { ...todo });
-  }
-
-  function persist() {
-    const data = JSON.stringify([...todos.values()]);
-    const tmp = resolvedPath + '.tmp.' + process.pid;
-    fs.writeFileSync(tmp, data, 'utf8');
-    fs.renameSync(tmp, resolvedPath);
-  }
-
-  function validationError(message) {
-    const err = new Error(message);
-    err.code = 'VALIDATION';
-    return err;
-  }
-
-  function cleanTitle(title) {
-    if (typeof title !== 'string') throw validationError('title must be a string');
-    const t = title.trim();
-    if (!t) throw validationError('title is required');
-    if (t.length > 200) throw validationError('title must be at most 200 characters');
-    return t;
+    todos.clear();
+    for (const [id, t] of nextTodos) todos.set(id, t);
   }
 
   return {
@@ -89,9 +59,9 @@ function createFileStore(filePath) {
       return t ? { ...t } : null;
     },
     add(title) {
-      const todo = { id: nextId++, title: cleanTitle(title), done: false, createdAt: new Date().toISOString() };
-      todos.set(todo.id, todo);
-      persist();
+      const todo = { id: nextId, title: cleanTitle(title), done: false, createdAt: new Date().toISOString() };
+      commit(new Map(todos).set(todo.id, todo));
+      nextId++;
       return { ...todo };
     },
     update(id, patch) {
@@ -104,14 +74,16 @@ function createFileStore(filePath) {
         if (typeof patch.done !== 'boolean') throw validationError('done must be a boolean');
         next.done = patch.done;
       }
-      todos.set(t.id, next);
-      persist();
+      commit(new Map(todos).set(t.id, next));
       return { ...next };
     },
     remove(id) {
-      const result = todos.delete(Number(id));
-      if (result) persist();
-      return result;
+      const key = Number(id);
+      if (!todos.has(key)) return false;
+      const nextTodos = new Map(todos);
+      nextTodos.delete(key);
+      commit(nextTodos);
+      return true;
     },
   };
 }

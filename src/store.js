@@ -50,4 +50,4 @@ function createStore() {
   };
 }
 
-module.exports = { createStore };
+module.exports = { createStore, cleanTitle, validationError };
