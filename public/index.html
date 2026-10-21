@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo App</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      line-height: 1.5;
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+      padding: 1.75rem;
+    }
+
+    header {
+      margin-bottom: 1.25rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .error-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      background-color: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 1.25rem;
+      font-size: 0.875rem;
+    }
+
+    .error-banner.hidden {
+      display: none;
+    }
+
+    .error-banner button {
+      background: none;
+      border: none;
+      color: #b91c1c;
+      font-size: 1.125rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0.2rem;
+    }
+
+    form#todo-form {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 0.625rem 0.875rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 0.9375rem;
+      color: #0f172a;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    button.btn-primary {
+      background-color: #2563eb;
+      color: #ffffff;
+      border: 1px solid #2563eb;
+      padding: 0.625rem 1.125rem;
+    }
+
+    button.btn-primary:hover {
+      background-color: #1d4ed8;
+      border-color: #1d4ed8;
+    }
+
+    .todo-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background-color: #ffffff;
+      transition: background-color 0.15s ease;
+    }
+
+    .todo-item:hover {
+      background-color: #f8fafc;
+    }
+
+    .todo-item input[type="checkbox"] {
+      width: 1.125rem;
+      height: 1.125rem;
+      cursor: pointer;
+      accent-color: #2563eb;
+    }
+
+    .todo-title {
+      flex: 1;
+      font-size: 0.9375rem;
+      word-break: break-word;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .todo-title.done {
+      text-decoration: line-through;
+      color: #94a3b8;
+    }
+
+    .edit-input {
+      flex: 1;
+      padding: 0.375rem 0.625rem;
+      font-size: 0.9375rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .item-actions {
+      display: flex;
+      gap: 0.375rem;
+    }
+
+    .item-actions button {
+      padding: 0.375rem 0.625rem;
+      border: 1px solid #cbd5e1;
+      background-color: #ffffff;
+      color: #475569;
+    }
+
+    .item-actions button:hover {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .item-actions button.btn-delete:hover {
+      background-color: #fee2e2;
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #64748b;
+      padding: 2.5rem 1rem;
+      font-size: 0.9375rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Todos</h1>
+    </header>
+
+    <div id="error-banner" class="error-banner hidden" role="alert">
+      <span id="error-text"></span>
+      <button id="dismiss-error" aria-label="Dismiss error">&times;</button>
+    </div>
+
+    <form id="todo-form">
+      <input
+        type="text"
+        id="todo-input"
+        placeholder="What needs to be done?"
+        maxlength="200"
+        autocomplete="off"
+        required
+      />
+      <button type="submit" class="btn-primary">Add</button>
+    </form>
+
+    <ul id="todo-list" class="todo-list"></ul>
+    <div id="empty-state" class="empty-state hidden">No todos yet. Add one above!</div>
+  </main>
+
+  <script>
+    'use strict';
+
+    const errorBanner = document.getElementById('error-banner');
+    const errorText = document.getElementById('error-text');
+    const dismissErrorBtn = document.getElementById('dismiss-error');
+    const todoForm = document.getElementById('todo-form');
+    const todoInput = document.getElementById('todo-input');
+    const todoList = document.getElementById('todo-list');
+    const emptyState = document.getElementById('empty-state');
+
+    let todos = [];
+
+    function showError(message) {
+      errorText.textContent = message;
+      errorBanner.classList.remove('hidden');
+    }
+
+    function clearError() {
+      errorBanner.classList.add('hidden');
+      errorText.textContent = '';
+    }
+
+    dismissErrorBtn.addEventListener('click', clearError);
+
+    async function apiRequest(url, options = {}) {
+      try {
+        const res = await fetch(url, options);
+        if (!res.ok) {
+          let errorMessage = `Request failed (${res.status})`;
+          try {
+            const data = await res.json();
+            if (data && data.error) errorMessage = data.error;
+          } catch {
+            // response was not JSON
+          }
+          showError(errorMessage);
+          throw new Error(errorMessage);
+        }
+        clearError();
+        if (res.status === 204) return null;
+        return await res.json();
+      } catch (err) {
+        if (!errorText.textContent) {
+          showError(err.message || 'An unexpected error occurred');
+        }
+        throw err;
+      }
+    }
+
+    async function fetchTodos() {
+      try {
+        const data = await apiRequest('/api/todos');
+        todos = Array.isArray(data) ? data : [];
+        render();
+      } catch (err) {
+        // Error banner already handled in apiRequest
+      }
+    }
+
+    async function addTodo(title) {
+      try {
+        const created = await apiRequest('/api/todos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title })
+        });
+        todos.push(created);
+        todoInput.value = '';
+        render();
+      } catch (err) {
+        // Error banner handled
+      }
+    }
+
+    async function toggleDone(id, done) {
+      try {
+        const updated = await apiRequest(`/api/todos/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ done })
+        });
+        todos = todos.map(t => (t.id === id ? updated : t));
+        render();
+      } catch (err) {
+        render(); // revert checkbox in DOM
+      }
+    }
+
+    async function updateTitle(id, newTitle) {
+      const trimmed = newTitle.trim();
+      if (!trimmed) {
+        showError('title is required');
+        render();
+        return;
+      }
+      try {
+        const updated = await apiRequest(`/api/todos/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: trimmed })
+        });
+        todos = todos.map(t => (t.id === id ? updated : t));
+        render();
+      } catch (err) {
+        render();
+      }
+    }
+
+    async function deleteTodo(id) {
+      try {
+        await apiRequest(`/api/todos/${id}`, { method: 'DELETE' });
+        todos = todos.filter(t => t.id !== id);
+        render();
+      } catch (err) {
+        // Error banner handled
+      }
+    }
+
+    function render() {
+      todoList.innerHTML = '';
+
+      if (todos.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      todos.forEach(todo => {
+        const li = document.createElement('li');
+        li.className = 'todo-item';
+        li.dataset.id = String(todo.id);
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = Boolean(todo.done);
+        checkbox.setAttribute('aria-label', 'Toggle completed');
+        checkbox.addEventListener('change', () => toggleDone(todo.id, checkbox.checked));
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = `todo-title ${todo.done ? 'done' : ''}`;
+        titleSpan.textContent = todo.title;
+        titleSpan.title = 'Double-click to edit';
+
+        const editInput = document.createElement('input');
+        editInput.type = 'text';
+        editInput.className = 'edit-input hidden';
+        editInput.value = todo.title;
+        editInput.maxLength = 200;
+
+        const actions = document.createElement('div');
+        actions.className = 'item-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.textContent = 'Edit';
+        editBtn.setAttribute('aria-label', 'Edit todo');
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'btn-delete';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.setAttribute('aria-label', 'Delete todo');
+        deleteBtn.addEventListener('click', () => deleteTodo(todo.id));
+
+        function enterEditMode() {
+          titleSpan.classList.add('hidden');
+          editInput.classList.remove('hidden');
+          editBtn.textContent = 'Save';
+          editInput.focus();
+          editInput.select();
+        }
+
+        function cancelEditMode() {
+          editInput.value = todo.title;
+          editInput.classList.add('hidden');
+          titleSpan.classList.remove('hidden');
+          editBtn.textContent = 'Edit';
+        }
+
+        function commitEdit() {
+          const val = editInput.value.trim();
+          if (val === todo.title) {
+            cancelEditMode();
+            return;
+          }
+          updateTitle(todo.id, val);
+        }
+
+        titleSpan.addEventListener('dblclick', enterEditMode);
+
+        editBtn.addEventListener('click', () => {
+          if (editInput.classList.contains('hidden')) {
+            enterEditMode();
+          } else {
+            commitEdit();
+          }
+        });
+
+        editInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            commitEdit();
+          } else if (e.key === 'Escape') {
+            cancelEditMode();
+          }
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+
+        li.appendChild(checkbox);
+        li.appendChild(titleSpan);
+        li.appendChild(editInput);
+        li.appendChild(actions);
+
+        todoList.appendChild(li);
+      });
+    }
+
+    todoForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const title = todoInput.value.trim();
+      if (title) addTodo(title);
+    });
+
+    document.addEventListener('DOMContentLoaded', fetchTodos);
+  </script>
+</body>
+</html>
