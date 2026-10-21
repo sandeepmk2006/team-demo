@@ -80,7 +80,19 @@ function createServer(store) {
 
     if (pathname === '/api/todos') {
       if (req.method === 'GET') {
-        sendJson(res, 200, store.list());
+        const done = url.searchParams.get('done');
+        if (done !== null && done !== 'true' && done !== 'false') {
+          sendError(res, 400, 'done must be true or false');
+          return;
+        }
+        const query = url.searchParams.get('q');
+        let todos = store.list();
+        if (done !== null) todos = todos.filter((todo) => todo.done === (done === 'true'));
+        if (query !== null) {
+          const normalizedQuery = query.toLocaleLowerCase();
+          todos = todos.filter((todo) => todo.title.toLocaleLowerCase().includes(normalizedQuery));
+        }
+        sendJson(res, 200, todos);
         return;
       }
       if (req.method === 'POST') {
