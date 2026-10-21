@@ -2,5 +2,5 @@
   "name": "team-demo",
   "version": "0.1.0",
   "private": true,
-  "scripts": { "start": "node src/server.js", "test": "node --test tests/" }
+  "scripts": { "start": "node src/server.js", "test": "node --test" }
 }

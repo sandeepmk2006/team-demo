@@ -7,6 +7,7 @@ const { createStore } = require('./store');
 
 const MAX_BODY_BYTES = 10 * 1024;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+const CONTENT_TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
 function sendJson(res, statusCode, value) {
   const body = JSON.stringify(value);
@@ -66,7 +67,7 @@ function servePublic(req, res, pathname) {
       sendError(res, 404, 'not found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.writeHead(200, { 'Content-Type': CONTENT_TYPES[path.extname(filePath)] || 'application/octet-stream' });
     res.end(data);
   });
 }
@@ -88,6 +89,7 @@ function createServer(store) {
           sendJson(res, 201, store.add(body && body.title));
         } catch (error) {
           if (error.code === 'VALIDATION') sendError(res, 400, error.message);
+          else if (!res.headersSent) sendError(res, 500, 'internal error');
         }
         return;
       }
@@ -111,6 +113,7 @@ function createServer(store) {
           else sendJson(res, 200, todo);
         } catch (error) {
           if (error.code === 'VALIDATION') sendError(res, 400, error.message);
+          else if (!res.headersSent) sendError(res, 500, 'internal error');
         }
         return;
       }

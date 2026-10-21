@@ -146,7 +146,10 @@ describe('API routes and SPEC compliance', () => {
       const list = await res.json();
       assert.ok(Array.isArray(list));
       assert.ok(list.length >= 3);
-      assert.equal(list[0].id, 1);
+      const ids = list.map((t) => t.id);
+      assert.deepEqual(ids, [...ids].sort((a, b) => a - b), 'todos are listed in creation order');
+      assert.equal(new Set(ids).size, ids.length, 'ids are unique');
+      for (const t of list) assert.deepEqual(t, await (await fetch(`${baseUrl}/api/todos/${t.id}`)).json());
     });
   });
 
