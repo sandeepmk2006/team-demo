@@ -22,3 +22,21 @@ Single file, vanilla JS, uses the API: list, add, toggle done, delete, inline ed
 
 ## Tests — tests/*.test.js (owner: agy), run with `node --test`
 store.test.js covers every store rule; api.test.js starts createServer(createStore()) on port 0 and covers every route + error case.
+
+## v2 features
+
+### Persistent store — src/file-store.js (owner: agy, complexity high)
+createFileStore(filePath) -> same interface and rules as createStore() (reuse/extend src/store.js behaviour exactly).
+- Loads existing todos from filePath on creation (missing file = empty; corrupt JSON -> throws Error with .code = 'CORRUPT_STORE').
+- Every add/update/remove persists synchronously and atomically (write temp file in same dir, then rename).
+- ids continue after the highest loaded id.
+- Tests: tests/file-store.test.js (temp dirs via fs.mkdtempSync(os.tmpdir())), covering reload, id continuation, atomic write, corrupt file.
+
+### Filtering — src/server.js + public/index.html (owner: copilot, complexity medium)
+- GET /api/todos?done=true|false filters by done; any other value of done -> 400.
+- GET /api/todos?q=text -> case-insensitive substring match on title; combinable with done.
+- UI: filter buttons All / Active / Done and a search box, using these query params.
+- Tests: tests/filter.test.js.
+
+### Wiring — lead
+`node src/server.js` uses createFileStore(process.env.DATA_FILE) when DATA_FILE is set, else in-memory.
